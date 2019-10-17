@@ -1,9 +1,9 @@
 module Taxonomy
   class UpdateTaxon
+    include BrexitTaxon
+
     attr_reader :taxon
     delegate :content_id, :parent_content_id, :associated_taxons, :legacy_taxons, to: :taxon
-
-    BREXIT_TAXON_CONTENT_ID = "d6c2de5d-ef90-45d1-82d4-5f2438369eea".freeze
 
     class InvalidTaxonError < StandardError; end
 
@@ -25,10 +25,7 @@ module Taxonomy
       # so that we can compare the differences between the two versions.
       Taxonomy::SaveTaxonVersion.call(taxon, @version_note)
 
-      Services.publishing_api.put_content(content_id, payload)
-      if content_id == BREXIT_TAXON_CONTENT_ID
-        Services.publishing_api.put_content(content_id, payload("cy"))
-      end
+      publishing_api_put_content_request(content_id)
 
       Taxonomy::LinksUpdate.new(
         content_id: content_id,
@@ -67,6 +64,13 @@ module Taxonomy
       Array(
         Tagging::BasePathLookup.find_by_base_paths(taxon.legacy_taxons),
       ).select(&:present?).map(&:content_id)
+    end
+
+    def publishing_api_put_content_request(content_id)
+      Services.publishing_api.put_content(content_id, payload)
+      return unless brexit_taxon?(content_id)
+
+      Services.publishing_api.put_content(content_id, payload("cy"))
     end
   end
 end
